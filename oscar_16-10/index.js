@@ -4,39 +4,6 @@ const app = express();
 
 app.use(express.json());
 
-// -----------------------------------------------------------------------------
-// FUNÇÕES AUXILIARES DE VALIDAÇÃO
-// -----------------------------------------------------------------------------
-
-// Valida e sanitiza o ID passado nas rotas (/tarefas/:id)
-function validarId(idParam) {
-  const idNum = Number(idParam);
-  if (!Number.isInteger(idNum) || idNum <= 0) {
-    return { valido: false, erro: 'O ID fornecido deve ser um número inteiro positivo.' };
-  }
-  return { valido: true, id: idNum };
-}
-
-// Valida tipo, presença, espaços vazios e tamanho máximo do título
-function validarTitulo(titulo) {
-  if (typeof titulo !== 'string') {
-    return { valido: false, erro: 'O campo "titulo" deve ser do tipo texto (string).' };
-  }
-
-  const tituloFormatado = titulo.trim();
-
-  if (tituloFormatado.length === 0) {
-    return { valido: false, erro: 'O campo "titulo" não pode estar vazio ou conter apenas espaços.' };
-  }
-
-  if (tituloFormatado.length > 255) {
-    return { valido: false, erro: 'O campo "titulo" não pode ter mais de 255 caracteres.' };
-  }
-
-  return { valido: true, tituloFormatado };
-}
-
-
 // 1. LISTAR tarefas com filtro por status e paginação
 app.get('/tarefas', async (req, res) => {
   try {
@@ -92,12 +59,14 @@ app.get('/tarefas/estatisticas', async (req, res) => {
 // 3. BUSCAR uma tarefa específica pelo ID
 app.get('/tarefas/:id', async (req, res) => {
   try {
-    const checagemId = validarId(req.params.id);
-    if (!checagemId.valido) {
-      return res.status(400).json({ erro: checagemId.erro });
+    const id = Number(req.params.id);
+
+    // Validação do ID
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ erro: 'O ID deve ser um número inteiro positivo.' });
     }
 
-    const resultado = await pool.query('SELECT * FROM tarefas WHERE id = $1', [checagemId.id]);
+    const resultado = await pool.query('SELECT * FROM tarefas WHERE id = $1', [id]);
     
     if (resultado.rows.length === 0) {
       return res.status(404).json({ erro: 'Tarefa não encontrada' });
@@ -115,14 +84,21 @@ app.post('/tarefas', async (req, res) => {
   try {
     const { titulo } = req.body;
 
-    const checagemTitulo = validarTitulo(titulo);
-    if (!checagemTitulo.valido) {
-      return res.status(400).json({ erro: checagemTitulo.erro });
+    // Validação de tipo e de conteúdo vazio
+    if (typeof titulo !== 'string' || titulo.trim().length === 0) {
+      return res.status(400).json({ erro: 'O campo "titulo" é obrigatório e deve ser um texto válido.' });
     }
+
+    // Validação de tamanho máximo
+    if (titulo.trim().length > 255) {
+      return res.status(400).json({ erro: 'O campo "titulo" deve ter no máximo 255 caracteres.' });
+    }
+
+    const tituloFormatado = titulo.trim();
 
     const resultado = await pool.query(
       'INSERT INTO tarefas (titulo) VALUES ($1) RETURNING *',
-      [checagemTitulo.tituloFormatado]
+      [tituloFormatado]
     );
 
     res.status(201).json(resultado.rows[0]);
@@ -135,18 +111,22 @@ app.post('/tarefas', async (req, res) => {
 // 5. ATUALIZAR uma tarefa existente
 app.put('/tarefas/:id', async (req, res) => {
   try {
-    const checagemId = validarId(req.params.id);
-    if (!checagemId.valido) {
-      return res.status(400).json({ erro: checagemId.erro });
+    const id = Number(req.params.id);
+
+    // Validação do ID
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ erro: 'O ID deve ser um número inteiro positivo.' });
     }
 
     const { titulo, concluida } = req.body;
 
+    // Garante que o corpo não veio vazio
     if (titulo === undefined && concluida === undefined) {
       return res.status(400).json({ erro: 'Forneça ao menos o campo "titulo" ou "concluida" para atualizar.' });
     }
 
-    const tarefaAtual = await pool.query('SELECT * FROM tarefas WHERE id = $1', [checagemId.id]);
+    // Busca a tarefa atual no banco
+    const tarefaAtual = await pool.query('SELECT * FROM tarefas WHERE id = $1', [id]);
     if (tarefaAtual.rows.length === 0) {
       return res.status(404).json({ erro: 'Tarefa não encontrada' });
     }
@@ -155,16 +135,18 @@ app.put('/tarefas/:id', async (req, res) => {
     let novoTitulo = atual.titulo;
     let novaConcluida = atual.concluida;
 
-    // Validação do título caso fornecido no body
+    // Validação do título caso tenha sido fornecido
     if (titulo !== undefined) {
-      const checagemTitulo = validarTitulo(titulo);
-      if (!checagemTitulo.valido) {
-        return res.status(400).json({ erro: checagemTitulo.erro });
+      if (typeof titulo !== 'string' || titulo.trim().length === 0) {
+        return res.status(400).json({ erro: 'O campo "titulo" deve ser um texto válido e não pode ser vazio.' });
       }
-      novoTitulo = checagemTitulo.tituloFormatado;
+      if (titulo.trim().length > 255) {
+        return res.status(400).json({ erro: 'O campo "titulo" deve ter no máximo 255 caracteres.' });
+      }
+      novoTitulo = titulo.trim();
     }
 
-    // Validação do campo concluída caso fornecido no body
+    // Validação do campo concluída caso tenha sido fornecido
     if (concluida !== undefined) {
       if (typeof concluida !== 'boolean') {
         return res.status(400).json({ erro: 'O campo "concluida" deve ser do tipo booleano (true ou false).' });
@@ -174,7 +156,7 @@ app.put('/tarefas/:id', async (req, res) => {
 
     const resultado = await pool.query(
       'UPDATE tarefas SET titulo = $1, concluida = $2 WHERE id = $3 RETURNING *',
-      [novoTitulo, novaConcluida, checagemId.id]
+      [novoTitulo, novaConcluida, id]
     );
 
     res.json(resultado.rows[0]);
@@ -187,12 +169,14 @@ app.put('/tarefas/:id', async (req, res) => {
 // 6. DELETAR uma tarefa
 app.delete('/tarefas/:id', async (req, res) => {
   try {
-    const checagemId = validarId(req.params.id);
-    if (!checagemId.valido) {
-      return res.status(400).json({ erro: checagemId.erro });
+    const id = Number(req.params.id);
+
+    // Validação do ID
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ erro: 'O ID deve ser um número inteiro positivo.' });
     }
 
-    const resultado = await pool.query('DELETE FROM tarefas WHERE id = $1 RETURNING *', [checagemId.id]);
+    const resultado = await pool.query('DELETE FROM tarefas WHERE id = $1 RETURNING *', [id]);
 
     if (resultado.rows.length === 0) {
       return res.status(404).json({ erro: 'Tarefa não encontrada' });

@@ -1,0 +1,19 @@
+Migrations são arquivos de código (scripts) que funcionam como um sistema de controle de versão para o esquema do banco de dados, registrando o histórico de criação e alteração das tabelas ao longo do tempo.
+
+São preferíveis à criação manual de tabelas pelos seguintes motivos:
+
+Consistência entre Ambientes: Garantem que os bancos de dados de desenvolvimento, teste e produção tenham exatamente a mesma estrutura, eliminando erros do tipo *"funciona na minha máquina"*.
+Versionamento de Código: Como as migrations são arquivos de texto, elas entram no Git junto com o código-fonte da aplicação, permitindo saber quem alterou o banco, quando e por quê.
+Automação no Deploy (CI/CD): Permitem que a atualização do banco ocorra de forma automática durante o processo de deploy, sem depender de intervenção humana rodando comandos SQL diretamente no servidor.
+Reversibilidade (Rollback): Possibilitam desfazer alterações facilmente (voltar para a versão anterior do esquema) caso ocorra algum problema após a atualização.
+Trabalho em Equipe: Evitam conflitos e sobrescritas de tabelas quando múltiplos desenvolvedores alteram o modelo de dados ao mesmo tempo, aplicando as mudanças na ordem cronológica correta.
+
+
+Controle de Acesso / API sem Autenticação — Enel SP (2020)
+
+A Falha: Falha grave de autorização/controle de acesso em um endpoint da API do portal de atendimento da distribuidora de energia.
+
+O Ataque: A API permitia consultar dados de clientes sem exigir autenticação adequada ou validação de escopo do usuário requisitante.
+
+O Impacto: Exposição de dados cadastrais completos (CPF, RG, endereço, número de telefone e dados da conta de energia) de cerca de 10 milhões de consumidores no estado de São Paulo.
+
